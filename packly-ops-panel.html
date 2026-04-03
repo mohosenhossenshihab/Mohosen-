@@ -1,0 +1,121 @@
+<!-- Update Status -->
+    <div class="ps">
+      <div class="ps-h"><div class="ps-t">ðŸ”„ Update Status</div></div>
+      <div class="ps-b">
+        <div class="os-row">
+          <button class="os-btn os-pending" onclick="updStatus(${i},'pending')">Pending</button>
+          <button class="os-btn os-processing" onclick="updStatus(${i},'processing')">Processing</button>
+          <button class="os-btn os-delivered" onclick="updStatus(${i},'delivered')">Delivered</button>
+          <button class="os-btn os-cancelled" onclick="updStatus(${i},'cancelled')">Cancelled</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('panelBD').classList.add('open');
+  if(focusNotes)setTimeout(()=>document.getElementById('noteSec')?.scrollIntoView({behavior:'smooth'}),300);
+  if(focusStock&&hasStockOut)setTimeout(()=>{document.getElementById('stockSec')?.scrollIntoView({behavior:'smooth'});showSimilar()},300);
+}
+
+function showSimilar(){
+  const s=document.getElementById('similarSec');
+  s.style.display=s.style.display==='flex'?'none':'flex';
+  s.style.flexDirection='column';
+}
+
+function selectSim(pi){
+  _panelSelectedSim=pi;
+  document.querySelectorAll('.sim-card').forEach((c,i)=>c.classList.toggle('selected',i===pi));
+  document.getElementById('transferBtn').style.display='flex';
+}
+
+function showTransferConfirm(){
+  if(_panelSelectedSim<0)return;
+  const p=similarProducts[_panelSelectedSim];
+  const tc=document.getElementById('transferConfirm');
+  tc.style.display='block';
+  document.getElementById('tcDetails').innerHTML=`
+    <div class="tc-row"><span class="tl">Transfer To</span><span class="tv">${p.shop}</span></div>
+    <div class="tc-row"><span class="tl">New Product</span><span class="tv">${p.name}</span></div>
+    <div class="tc-row"><span class="tl">New Price</span><span class="tv">à§³${p.price.toLocaleString()}</span></div>
+    <div class="tc-row"><span class="tl">Stock Available</span><span class="tv">${p.stockQty} units</span></div>`;
+}
+
+function confirmTransfer(i){
+  const p=similarProducts[_panelSelectedSim];
+  orders[i].shop=p.shop;orders[i].products[0].name=p.name;orders[i].products[0].price=p.price;orders[i].products[0].stock='in';orders[i].products[0].stockQty=p.stockQty;orders[i].custCallStatus='Confirmed';
+  renderTable();closePanel();
+  alert(`âœ… Order transferred to ${p.shop}\nProduct: ${p.name}`);
+}
+
+function switchTab(el,tab){
+  document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('on'));el.classList.add('on');
+  document.getElementById('tabCust').style.display=tab==='cust'?'block':'none';
+  document.getElementById('tabMerch').style.display=tab==='merch'?'block':'none';
+}
+
+function setCS(i,who,val){const k=who==='cust'?'custCallStatus':'merchCallStatus';orders[i][k]=val;renderTable();}
+function updStatus(i,s){orders[i].status=s;renderTable();closePanel();}
+function closePanel(){document.getElementById('panelBD').classList.remove('open')}
+function closePanelBD(e){if(e.target===document.getElementById('panelBD'))closePanel()}
+
+/* â”€â”€ PRODUCT STATS â”€â”€ */
+function openProdStat(i){
+  const o=orders[i];const p=o.products[0];const s=o.prodStats;
+  document.getElementById('psTitle').textContent=p.name;
+  document.getElementById('psShop').textContent='ðŸª '+o.shop;
+  document.getElementById('psBody').innerHTML=`
+    <div class="stat-grid stat-grid-6">
+      <div class="sg"><div class="sg-v">${s.orders}</div><div class="sg-l">Total Orders</div></div>
+      <div class="sg"><div class="sg-v">${s.delivered}</div><div class="sg-l">Delivered</div></div>
+      <div class="sg"><div class="sg-v">${s.returned}</div><div class="sg-l">Returned</div></div>
+      <div class="sg"><div class="sg-v">${s.cancelled}</div><div class="sg-l">Cancelled</div></div>
+      <div class="sg"><div class="sg-v">${Math.round(s.delivered/s.orders*100)}%</div><div class="sg-l">Success Rate</div></div>
+      <div class="sg"><div class="sg-v">${p.stock==='out'?'OUT':p.stock==='low'?'LOW':s.stock}</div><div class="sg-l">Current Stock</div></div>
+    </div>
+    <div style="margin-top:10px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text3);margin-bottom:8px">ðŸ“¦ Stock in Other Shops</div>
+      <div class="shop-list">
+        ${similarProducts.map(sp=>`<div class="shop-item"><div class="shop-item-name">${sp.shop}</div><div class="shop-item-stock ${sp.stockQty>5?'ok':sp.stockQty>0?'low':'out'}">${sp.stockQty>0?sp.stockQty+' available':'Stock Out'}</div></div>`).join('')}
+      </div>
+    </div>`;
+  document.getElementById('prodStatBD').classList.add('open');
+}
+function closeProdStat(e){if(!e||e.target===document.getElementById('prodStatBD'))document.getElementById('prodStatBD').classList.remove('open')}
+
+/* â”€â”€ LOGISTICS â”€â”€ */
+function openLog(i){
+  const o=orders[i];
+  document.getElementById('logCN').textContent=o.cnId?`CN: ${o.cnId} Â· ${o.trk}`:`TRK: ${o.trk} (CN not assigned)`;
+  const steps=[
+    {s:'done',icon:'âœ“',t:'Order Placed',time:`${o.date} ${o.time}`,loc:'Packly System'},
+    {s:'done',icon:'âœ“',t:'Picked Up',time:`${o.date} 18:30`,loc:'Packly Warehouse, Dhaka'},
+    {s:'active',icon:'â–¶',t:'In Transit',time:'06-Mar-2026  09:15',loc:'Gazipur Sorting Hub'},
+    {s:'wait',icon:'â—‹',t:'Out for Delivery',time:'â€”',loc:'â€”'},
+    {s:'wait',icon:'â—‹',t:'Delivered',time:'â€”',loc:'â€”'},
+  ];
+  document.getElementById('logBody').innerHTML=`
+    <div class="track-steps">${steps.map(s=>`<div class="ts"><div class="ts-dot ${s.s}">${s.icon}</div><div class="ts-info"><div class="ts-title ${s.s}">${s.t}</div><div class="ts-time">${s.time}</div><div class="ts-loc">${s.loc}</div></div></div>`).join('')}</div>
+    <div class="courier-row"><div><div class="courier-name">Steadfast Courier</div><div class="courier-cn">${o.cnId||'Not Assigned'}</div></div><div class="courier-link" onclick="alert('Opening Steadfastâ€¦')">Track â†—</div></div>`;
+  document.getElementById('logBD').classList.add('open');
+}
+function closeLog(){document.getElementById('logBD').classList.remove('open')}
+function closeLogBD(e){if(e.target===document.getElementById('logBD'))closeLog()}
+
+/* â”€â”€ SLA â”€â”€ */
+function openSLAPopup(){
+  const slaOrders=orders.filter(o=>isSLA(o));
+  document.getElementById('slaBody').innerHTML=slaOrders.length?slaOrders.map(o=>`
+    <div class="sla-item" onclick="closeSLA();openPanel(${o.id})">
+      <div><div class="sla-item-inv">#${o.inv}</div><div class="sla-item-name">${o.cname}</div><div style="font-size:10px;color:var(--text2);margin-top:1px">ðŸª ${o.shop}</div></div>
+      <div class="sla-item-time"><div class="sla-hrs">${o.hoursAgo}h</div><div class="sla-hrs-l">overdue</div></div>
+    </div>`).join(''):'<div style="text-align:center;color:var(--text3);padding:20px">No SLA breaches ðŸŽ‰</div>';
+  document.getElementById('slaBD').classList.add('open');
+}
+function closeSLA(){document.getElementById('slaBD').classList.remove('open')}
+function closeSLABD(e){if(e.target===document.getElementById('slaBD'))closeSLA()}
+
+renderTable();
+</script>
+</body>
+  </html>
